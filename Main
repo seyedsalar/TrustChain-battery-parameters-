@@ -1,0 +1,239 @@
+// This is a simple example for obtaining the battery information on the Android smartphone
+
+// Add the following to your AndroidManifest.xml
+
+/* 
+//Required for the file read/write
+<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+
+//Required to obtain the battery-related data
+<receiver android:name=".PowerConnectionReceiver">
+    <intent-filter>
+        <action android:name="android.intent.action.ACTION_POWER_CONNECTED"/>
+        <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED"/>
+
+    </intent-filter>
+</receiver>
+*/
+
+package com.example.measurebtr;
+import androidx.appcompat.app.AppCompatActivity;
+import android.content.IntentFilter;
+import android.os.BatteryManager;
+import android.os.Bundle;
+import android.content.Context;
+import android.content.Intent;
+import android.os.Environment;
+import android.provider.Settings;
+import android.util.Log;
+import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.TextView;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.TimeUnit;
+
+public class MainActivity extends AppCompatActivity {
+
+    private Timer  readMeasurementsTimer;
+
+    private Context context = this;
+
+    private IntentFilter ifilter;
+
+    private Intent batteryStatus;
+
+    private int level;
+
+    private int scale;
+
+    private int temperature;
+
+    private int voltage;
+
+    private TextView textViewDataObj;
+
+    private Date currentTime;
+
+    private double adaptedTemperature;
+
+    private String allData;
+
+    private String tempData;
+
+    private int thresholdBatteryLevel;
+
+    private boolean keepMonitoring;
+
+    private Date startDate;
+
+    private Date curDate;
+
+    private long diffInMs;
+
+    private long diffInSec;
+
+    private Button buttonStart;
+
+    private EditText editText;
+	
+	private String tmp;
+
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        startDate = Calendar.getInstance().getTime();
+
+		// Get device ID to be added to the file for future classification purposes
+        String android_id = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
+
+        allData = "Device ID " + android_id + "\n";
+
+        keepMonitoring = true;
+
+        setContentView(R.layout.activity_main);
+		
+        buttonStart = (Button) findViewById(R.id.buttonStart);
+		
+        editText = (EditText) findViewById(R.id.txtSub);
+
+         buttonStart.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                 readMeasurementsTimer = new Timer();
+				 
+                 readMeasurementsTimer.schedule(new TimerTask() {
+                    @Override
+                    public void run() {
+                        TimerMethod();
+                    }
+
+                }, 0, 300000);
+
+
+                setContentView(R.layout.activity_main);
+				
+                editText = (EditText) findViewById(R.id.txtSub);
+				
+                tmp = et.getText().toString();
+				
+                thresholdBatteryLevel =  Integer.parseInt(tmp);
+
+                tmp = "Set to "+ tmp;
+
+                editText.setText(tmp);
+
+            }
+        });
+
+    }
+
+    private void writeToFile(String data,Context context) {
+		
+		//Change the path/file name and do not forget to grant the read/write permissions
+        String fullPath = Environment.getExternalStorageDirectory().getAbsolutePath() + "/test";
+        try
+        {
+            File dir = new File(fullPath);
+            
+			if (!dir.exists()) {
+                dir.mkdirs();
+            }
+			
+            OutputStream fOut = null;
+			
+            File file = new File(fullPath, "test.txt");
+			
+            if(file.exists())
+                file.delete();
+			
+            file.createNewFile();
+			
+            fOut = new FileOutputStream(file);
+
+            fOut.write(allData.getBytes());
+			
+            fOut.flush();
+			
+            fOut.close();
+
+        }
+        catch (Exception e)
+        {
+            Log.e("saveToExternalStorage()", e.getMessage());
+        }
+    }
+
+    private void TimerMethod()
+    {
+        this.runOnUiThread(Timer_Tick);
+    }
+
+
+    private Runnable Timer_Tick = new Runnable() {
+        public void run() {
+
+            setContentView(R.layout.activity_main);
+
+            ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+			
+            batteryStatus = context.registerReceiver(null, ifilter);
+
+            level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+			
+            scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+
+            voltage = batteryStatus.getIntExtra("voltage", 0);
+			
+            temperature = batteryStatus.getIntExtra("temperature", 0);
+
+			// temperature adaptation, e.g., to "36.6"
+            adaptedTemperature = (double)temperature / 10;
+
+            textViewDataObj = (TextView) findViewById(R.id.textViewData);
+
+            currentTime = Calendar.getInstance().getTime();
+
+
+			// Check if it is time to stop the collection
+            if (level>thresholdBatteryLevel){
+
+                curDate = Calendar.getInstance().getTime();
+
+                diffInMs = curDate.getTime() - startDate.getTime();
+				
+                diffInSec = TimeUnit.MILLISECONDS.toMinutes(diffInMs);
+
+				// Form the string to add to the file per line (for ease of export, e.g., to csv)
+                tempData = currentTime + "\n Level \t" + level + "\n Max \t" + scale + "\n Voltage \t" + voltage + "\n Temperature \t" + adaptedTemperature + "\n Minutes from start \t" + diffInSec + "\n";
+				
+				// Update the information in the GUI
+                textViewDataObj.setText(tempData);
+				
+                allData=allData+tempData+"\n";
+
+            }
+            else {
+
+                if(keepMonitoring) {
+                    textViewDataObj.setText("Collection complete.");
+					
+                    writeToFile(allData, context);
+                }
+
+                keepMonitoring = false;
+                readMeasurementsTimer.cancel();
+
+            }
+        }
+    };
+
+}
