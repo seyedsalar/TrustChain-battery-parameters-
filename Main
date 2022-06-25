@@ -1,5 +1,3 @@
-// This is a simple example for obtaining the battery information on the Android smartphone
-
 // Add the following to your AndroidManifest.xml
 
 /* 
@@ -54,19 +52,11 @@ public class MainActivity extends AppCompatActivity {
 
     private int scale;
 
-    private int temperature;
-
-    private int voltage;
-
     private TextView textViewDataObj;
 
     private Date currentTime;
 
-    private double adaptedTemperature;
-
     private String allData;
-
-    private String tempData;
 
     private int thresholdBatteryLevel;
 
@@ -191,13 +181,6 @@ public class MainActivity extends AppCompatActivity {
 			
             scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
 
-            voltage = batteryStatus.getIntExtra("voltage", 0);
-			
-            temperature = batteryStatus.getIntExtra("temperature", 0);
-
-			// temperature adaptation, e.g., to "36.6"
-            adaptedTemperature = (double)temperature / 10;
-
             textViewDataObj = (TextView) findViewById(R.id.textViewData);
 
             currentTime = Calendar.getInstance().getTime();
@@ -213,12 +196,8 @@ public class MainActivity extends AppCompatActivity {
                 diffInSec = TimeUnit.MILLISECONDS.toMinutes(diffInMs);
 
 				// Form the string to add to the file per line (for ease of export, e.g., to csv)
-                tempData = currentTime + "\n Level \t" + level + "\n Max \t" + scale + "\n Voltage \t" + voltage + "\n Temperature \t" + adaptedTemperature + "\n Minutes from start \t" + diffInSec + "\n";
+                Data = currentTime + "\n Level \t" + level + "\n Max \t" + scale + "\n Minutes from start \t" + diffInSec + "\n";
 				
-				// Update the information in the GUI
-                textViewDataObj.setText(tempData);
-				
-                allData=allData+tempData+"\n";
 
             }
             else {
